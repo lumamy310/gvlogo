@@ -9,6 +9,8 @@ extern void yyerror(const char* s);
 %%
 
 ;				{ return SEP; }
+\$[A-Z]				{ yylval.s = yytext; return VARIABLENAME; }
+=				{ return EQUAL; }
 penup				{ return PENUP; }
 pendown				{ return PENDOWN; }
 print				{ return PRINT; }
@@ -26,7 +28,7 @@ save				{ return SAVE; }
 \/				{ return DIV; }
 where				{ return WHERE; }
 \"[ A-Za-z]+\"			{ yylval.s = yytext; return QSTRING; }
-[ A-Za-z.\/]+			{ yylval.s = yytext; return STRING; }
+[A-Za-z.\/]+			{ yylval.s = yytext; return STRING; }
 [ \t\r\n]			{ ; }
 .			{ yyerror("Lexing Syntax error.\n"); } 
 

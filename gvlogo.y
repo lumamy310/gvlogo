@@ -29,6 +29,7 @@ static double x = WIDTH / 2;
 static double y = HEIGHT / 2;
 static int pen_state = 1;
 static double direction = 0.0;
+static int variables[26];
 
 int yylex(void);
 int yyerror(const char* s);
@@ -46,6 +47,12 @@ void save(const char* path);
 void shutdown();
 void where();
 void gotoo(double nx, double ny);
+void output_num(int n);
+void addtoarray(char* name, int value);
+void movevar(char* var);
+void turnvar(char* var);
+void gotoovar(char* varx, char* vary);
+int lookup(char* var);
 
 %}
 
@@ -71,8 +78,10 @@ void gotoo(double nx, double ny);
 %token PLUS SUB MULT DIV
 %token WHERE
 %token GOTO
+%token<s> VARIABLENAME
+%token EQUAL
 %token<s> STRING QSTRING
-%type<f> expression NUMBER
+%type<f> expression NUMBER variable
 %left PLUS MULT SUB DIV
 
 %%
@@ -83,8 +92,9 @@ statement_list:		statement
 		|	statement statement_list
 		;
 statement:		command SEP					{ prompt(); }
-	 	|	expression SEP					
-		|	error '\n' 					{ yyerrok; prompt(); }
+	 	|	expression SEP					{ prompt(); }
+		|	variable SEP					{ prompt(); }
+		|	error ';' 					{ yyerrok; prompt(); }
 		;
 command:		PENUP						{ penup(); }
        		|	PENDOWN						{ pendown(); }
@@ -93,15 +103,20 @@ command:		PENUP						{ penup(); }
 		|	CHANGE_COLOR NUMBER NUMBER NUMBER		{ change_color($2,$3,$4); }
 		|	CLEAR						{ clear(); }
 		|	TURN NUMBER					{ turn($2); }
+		|	TURN VARIABLENAME				{ turnvar($2); }
 		|	MOVE NUMBER					{ move($2); }
 		|	WHERE						{ where(); }
 		|	GOTO NUMBER NUMBER				{ gotoo($2,$3); }
+		|	GOTO VARIABLENAME VARIABLENAME			{ gotoovar($2,$3); }
 		;
-expression:		expression PLUS expression			{ $$ = $1 + $3; output($$); }
-		|	expression MULT expression			{ $$ = $1 * $3; output($$); }
-		|	expression SUB expression			{ $$ = $1 - $3; output($$); }
-		|	expression DIV expression			{ $$ = $1 / $3; output($$); }
+variable:		VARIABLENAME EQUAL expression			{ $$ = $3; addtoarray($1,$3) }
+		;
+expression:		expression PLUS expression			{ $$ = $1 + $3; output_num($$); }
+		|	expression MULT expression			{ $$ = $1 * $3; output_num($$); }
+		|	expression SUB expression			{ $$ = $1 - $3; output_num($$); }
+		|	expression DIV expression			{ $$ = $1 / $3; output_num($$); }
 		|	NUMBER						{ $$ = $1; }
+		|	VARIABLENAME					{ $$ = lookup($1); }
 		;
 
 %%
@@ -109,6 +124,55 @@ expression:		expression PLUS expression			{ $$ = $1 + $3; output($$); }
 int main(int argc, char** argv){
 	startup();
 	return 0;
+}
+
+int lookup(char* var){
+	char varname = var[1];
+	varname = (int)varname;
+	int index = varname - 65;
+	return variables[index];
+}
+
+void addtoarray(char* name, int value){
+	char varname = name[1];
+	varname = (int)varname;
+	int index = varname - 65;
+	variables[index] = value;
+}
+
+void movevar(char* var){
+	char varname = var[1];
+	varname = (int)varname;
+	int index = varname - 65;
+
+	event.type = DRAW_EVENT;
+	event.user.code = 1;
+	event.user.data1 = variables[index];
+	SDL_PushEvent(&event);
+}
+
+void turnvar(char* var){
+	char varname = var[1];
+	varname = (int)varname;
+	int index = varname - 65;
+
+	event.type = PEN_EVENT;
+	event.user.code = 2;
+	event.user.data1 = variables[index];
+	SDL_PushEvent(&event);
+}
+
+void gotoovar(char* varx, char* vary){
+	char varxname = varx[1];
+	varxname = (int)varxname;
+	int indexx = varxname - 65;
+
+	char varyname = vary[1];
+	varyname = (int)varyname;
+	int indexy = varyname - 65;	
+
+	x = variables[indexx];
+	y = variables[indexy];
 }
 
 int yyerror(const char* s){
@@ -148,6 +212,10 @@ void turn(int dir){
 
 void output(const char* s){
 	printf("%s\n", s);
+}
+
+void output_num(int n){
+	printf("%d\n", n);
 }
 
 void change_color(int r, int g, int b){
@@ -254,7 +322,7 @@ void save(const char* path){
 }
 
 void where(){
-	printf("Turtle is at (x: %d, y: %d)", x, y);
+	printf("Turtle is at (x: %f, y: %f)\n", x, y);
 }
 
 void gotoo(double nx, double ny){
